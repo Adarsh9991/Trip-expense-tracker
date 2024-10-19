@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trip Expense Tracker</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: "Arial", sans-serif;
+      }
+      body {
+        background-color: #f0f8ff;
+        color: #4b0082; /* Violet text */
+      }
+      .container {
+        width: 90%;
+        max-width: 600px;
+        margin: 30px auto;
+        padding: 20px;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        overflow-y: auto; /* Enable scrolling */
+        max-height: 80vh; /* Limit height */
+      }
+      h1,
+      h2 {
+        text-align: center;
+        margin-bottom: 10px;
+      }
+      input,
+      select,
+      button {
+        width: 100%;
+        padding: 10px;
+        margin: 5px 0;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      button {
+        background-color: #6a5acd; /* Violet button */
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #483d8b; /* Darker violet on hover */
+      }
+      .delete-button {
+        background-color: #ffcccb; /* Light red */
+      }
+      .delete-button:hover {
+        background-color: #ff9999; /* Darker light red on hover */
+      }
+      .button-container {
+        display: flex;
+        justify-content: flex-end; /* Align buttons to the right */
+        align-items: center;
+        width: 100%;
+      }
+      .accordion {
+        background-color: #e6e6fa; /* Light lavender */
+        border: 1px solid #6a5acd; /* Violet border */
+        border-radius: 5px;
+        margin: 5px 0;
+      }
+      .accordion-header {
+        padding: 10px;
+        cursor: pointer;
+        font-weight: bold;
+        color: #4b0082; /* Violet text */
+      }
+      ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      li {
+        display: flex;
+        margin-inline: 10px;
+        align-items: center;
+      }
+
+      .trip-item {
+        display: flex;
+        justify-content: space-between; /* Align trip name left and buttons right */
+        align-items: center;
+        padding: 10px;
+        border-bottom: 1px solid #ccc;
+      }
+      .action-button {
+        width: 30px;
+        height: 30px;
+        margin-left: 5px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 5px;
+        font-size: 20px; /* Increase icon size */
+      }
+      .hidden {
+        display: none;
+      }
+
+      #tripDetails {
+        position: relative; /* Allow positioning of child elements */
+      }
+
+      .home-button {
+        width: 55px; /* 25% width of the container */
+        padding: 10px;
+        background-color: #6a5acd; /* Violet button */
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;
+        position: absolute; /* Position it at the top left */
+      }
+
+      .home-button:hover {
+        background-color: #483d8b; /* Darker violet on hover */
+      }
+
+      .expenseName{
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div id="dashboard">
+        <h1>Trip Expense Tracker</h1>
+        <ul id="tripList"></ul>
+        <button onclick="showAddTripForm()">Add New Trip</button>
+      </div>
+
+      <div id="tripDetails" class="hidden">
+        <button class="home-button" onclick="goBackToDashboard()">Home</button>
+
+        <h1 id="tripTitle">Trip Details</h1>
+        <div>
+          <h2>Add Participant</h2>
+          <input
+            type="text"
+            id="participantName"
+            placeholder="Enter Participant Name"
+          />
+          <button onclick="addParticipant()">Add Participant</button>
+        </div>
+
+        <div class="accordion">
+          <div
+            class="accordion-header"
+            onclick="toggleAccordion('participantAccordion')"
+          >
+            Participants
+          </div>
+          <div class="accordion-content" id="participantAccordion">
+            <ul id="participantList"></ul>
+          </div>
+        </div>
+
+        <div>
+          <h2>Add Expense</h2>
+          <select id="spender">
+            <option value="">Select Spender</option>
+          </select>
+          <input
+            type="text"
+            id="expenseDescription"
+            placeholder="Expense Description"
+          />
+          <input
+            type="number"
+            id="expenseAmount"
+            placeholder="Expense Amount"
+          />
+          <button onclick="addExpense()">Add Expense</button>
+        </div>
+
+        <div class="accordion">
+          <div
+            class="accordion-header"
+            onclick="toggleAccordion('expenseAccordion')"
+          >
+            Expenses
+          </div>
+          <div class="accordion-content" id="expenseAccordion">
+            <ul id="expenseList"></ul>
+          </div>
+        </div>
+
+        <div>
+          <button onclick="calculateSettlements()">Calculate Settlements</button>
+          <div id="summary"></div>
+          <ul id="settlementList"></ul>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const trips = JSON.parse(localStorage.getItem("trips")) || {};
+
+      function saveTrips() {
+        localStorage.setItem("trips", JSON.stringify(trips));
+      }
+
+      function showAddTripForm() {
+        const tripName = prompt("Enter Trip Name:");
+        if (!tripName) return alert("Trip name is required.");
+
+        trips[tripName] = { participants: [], expenses: [] };
+        saveTrips();
+        loadTrips();
+      }
+
+      function loadTrips() {
+    const tripList = document.getElementById("tripList");
+    tripList.innerHTML = "";
+
+    Object.keys(trips).forEach((trip) => {
+        const li = document.createElement("li");
+        li.classList.add("trip-item");
+        li.innerHTML = `
+            <strong>${trip}</strong>
+            <div class="button-container">
+                <button class="action-button" onclick="viewTrip('${trip}')">👁️</button>
+                <button class="action-button delete-button" onclick="deleteTrip('${trip}')">🗑️</button>
+            </div>`;
+        tripList.appendChild(li);
+    });
+}
+
+      function viewTrip(tripName) {
+        localStorage.setItem("currentTrip", tripName);
+        document.getElementById("dashboard").classList.add("hidden");
+        document.getElementById("tripDetails").classList.remove("hidden");
+        document.getElementById("tripTitle").textContent = `Trip: ${tripName}`;
+        displayParticipants();
+        displayExpenses();
+      }
+
+      function deleteTrip(tripName) {
+        if (confirm(`Are you sure you want to delete the trip "${tripName}"?`)) {
+          delete trips[tripName];
+          saveTrips();
+          loadTrips();
+        }
+      }
+
+      function goBackToDashboard() {
+        document.getElementById("tripDetails").classList.add("hidden");
+        document.getElementById("dashboard").classList.remove("hidden");
+      }
+
+      function addParticipant() {
+        const tripName = localStorage.getItem("currentTrip");
+        const participantName = document.getElementById("participantName").value.trim();
+        if (!participantName) return alert("Please enter a participant name.");
+
+        trips[tripName].participants.push({
+          name: participantName,
+          totalSpent: 0,
+        });
+        saveTrips();
+        displayParticipants();
+        updateSpenderOptions();
+        document.getElementById("participantName").value = "";
+      }
+
+      function displayParticipants() {
+        const tripName = localStorage.getItem("currentTrip");
+        const participantList = document.getElementById("participantList");
+        participantList.innerHTML = "";
+
+        trips[tripName].participants.forEach((participant, index) => {
+          const li = document.createElement("li");
+          li.textContent = participant.name;
+          li.innerHTML += `
+          <div class="button-container">
+            <button class="action-button" onclick="editParticipant(${index})">✏️</button>
+            <button class="action-button delete-button" onclick="deleteParticipant(${index})">🗑️</button>
+          </div>
+        `;
+          participantList.appendChild(li);
+        });
+      }
+
+      function editParticipant(index) {
+        const tripName = localStorage.getItem("currentTrip");
+        const newName = prompt("Enter new name:", trips[tripName].participants[index].name);
+        if (newName) {
+          trips[tripName].participants[index].name = newName;
+          saveTrips();
+          displayParticipants();
+          updateSpenderOptions();
+        }
+      }
+
+      function deleteParticipant(index) {
+        const tripName = localStorage.getItem("currentTrip");
+        trips[tripName].participants.splice(index, 1);
+        saveTrips();
+        displayParticipants();
+        updateSpenderOptions();
+      }
+
+      function updateSpenderOptions() {
+    const tripName = localStorage.getItem("currentTrip");
+    const spenderSelect = document.getElementById("spender");
+    spenderSelect.innerHTML = "<option value=''>Select Spender</option>";
+
+    // Check if tripName exists and has participants
+    if (tripName && trips[tripName] && trips[tripName].participants) {
+        trips[tripName].participants.forEach((participant) => {
+            const option = document.createElement("option");
+            option.value = participant.name;
+            option.textContent = participant.name;
+            spenderSelect.appendChild(option);
+        });
+    }
+}
+
+      function addExpense() {
+        const tripName = localStorage.getItem("currentTrip");
+        const spender = document.getElementById("spender").value;
+        const description = document.getElementById("expenseDescription").value.trim();
+        const amount = parseFloat(document.getElementById("expenseAmount").value);
+
+        if (!spender || !description || isNaN(amount) || amount <= 0) {
+          return alert("Please fill all fields with valid data.");
+        }
+
+        trips[tripName].expenses.push({
+          description,
+          amount,
+          spender,
+        });
+        updateTotalSpent(spender, amount);
+        saveTrips();
+        displayExpenses();
+        document.getElementById("expenseDescription").value = "";
+        document.getElementById("expenseAmount").value = "";
+      }
+
+      function updateTotalSpent(spender, amount) {
+        const tripName = localStorage.getItem("currentTrip");
+        const participant = trips[tripName].participants.find(p => p.name === spender);
+        if (participant) {
+          participant.totalSpent += amount;
+          saveTrips();
+        }
+      }
+
+      function displayExpenses() {
+        const tripName = localStorage.getItem("currentTrip");
+        const expenseList = document.getElementById("expenseList");
+        expenseList.innerHTML = "";
+
+        trips[tripName].expenses.forEach((expense, index) => {
+          const li = document.createElement("li");
+          li.innerHTML = `<div class="expenseName" > <strong>${expense.description}</strong> - ₹${expense.amount} (${expense.spender})</div>
+          <div class="button-container">
+            <button class="action-button" onclick="editExpense(${index})">✏️</button>
+            <button class="action-button delete-button" onclick="deleteExpense(${index})">🗑️</button>
+          </div>`;
+          expenseList.appendChild(li);
+        });
+      }
+
+      function editExpense(index) {
+        const tripName = localStorage.getItem("currentTrip");
+        const expense = trips[tripName].expenses[index];
+        const newDescription = prompt("Enter new description:", expense.description);
+        const newAmount = prompt("Enter new amount:", expense.amount);
+
+        if (newDescription && !isNaN(newAmount) && newAmount > 0) {
+          const amountDifference = newAmount - expense.amount;
+          expense.description = newDescription;
+          expense.amount = parseFloat(newAmount);
+          updateTotalSpent(expense.spender, amountDifference);
+          saveTrips();
+          displayExpenses();
+        }
+      }
+
+      function deleteExpense(index) {
+        const tripName = localStorage.getItem("currentTrip");
+        const expense = trips[tripName].expenses[index];
+        updateTotalSpent(expense.spender, -expense.amount); // Decrease the total spent by the spender
+        trips[tripName].expenses.splice(index, 1);
+        saveTrips();
+        displayExpenses();
+      }
+
+      function calculateSettlements() {
+        const tripName = localStorage.getItem("currentTrip");
+        const totalAmountSpent = trips[tripName].expenses.reduce((acc, expense) => acc + expense.amount, 0);
+        const numberOfParticipants = trips[tripName].participants.length;
+
+        if (numberOfParticipants === 0) {
+          return alert("No participants to settle expenses.");
+        }
+
+        const amountPerPerson = totalAmountSpent / numberOfParticipants;
+        const summary = trips[tripName].participants.map((participant) => {
+          const amountOwed = participant.totalSpent - amountPerPerson;
+          return {
+            name: participant.name,
+            amount: amountOwed,
+          };
+        });
+
+        displaySettlements(summary);
+      }
+
+      function displaySettlements(summary) {
+    const settlementList = document.getElementById("settlementList");
+    settlementList.innerHTML = ""; // Clear previous settlements
+    const totalAmount = summary.reduce((acc, participant) => acc + participant.amount, 0);
+    
+    summary.forEach((participant) => {
+        const li = document.createElement("li");
+        li.textContent = `${participant.name}: `;
+        settlementList.appendChild(li);
+
+        // Determine if the participant needs to give or take money
+        const message = document.createElement("span");
+        if (participant.amount < 0) {
+            message.textContent = ` Give: ₹${Math.abs(participant.amount).toFixed(2)}`
+            message.style.color = "red"; // Optional: Style for clarity
+        } else if (participant.amount > 0) {
+            message.textContent = ` Take: ₹${participant.amount.toFixed(2)}`;
+            message.style.color = "green"; // Optional: Style for clarity
+        } else {
+            message.textContent = " (Settled)";
+        }
+        li.appendChild(message);
+    });
+
+    const totalLi = document.createElement("li");
+    totalLi.textContent = `Total Amount Settled: ₹${totalAmount.toFixed(2)}`;
+    settlementList.appendChild(totalLi);
+}
+
+      function toggleAccordion(accordionId) {
+        const accordionContent = document.getElementById(accordionId);
+        accordionContent.classList.toggle("hidden");
+      }
+      function initializeApp() {
+    loadTrips(); // Load trips to display
+    updateSpenderOptions(); // Update spender options based on the current trip
+}
+
+initializeApp();
+    </script>
+  </body>
+</html>
